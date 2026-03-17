@@ -1,11 +1,13 @@
 {
   "name": "proyectom2_hernanramiroalbornoz",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "MiniBlog API",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "repository": {
     "type": "git",
@@ -14,7 +16,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/HRamiroAlbornoz/ProyectoM2_HernanRamiroAlbornoz/issues"
   },
@@ -22,5 +24,10 @@
   "dependencies": {
     "express": "^5.2.1",
     "pg": "^8.20.0"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.0",
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.0"
   }
 }
