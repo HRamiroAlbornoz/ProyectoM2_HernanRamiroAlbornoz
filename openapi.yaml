@@ -50,6 +50,8 @@ info:
 servers:
   - url: http://localhost:3000
     description: Servidor de desarrollo local
+  - url: https://tu-app.railway.app
+    description: Servidor de producción (Railway)
 
 tags:
   - name: General
@@ -712,7 +714,7 @@ components:
           type: string
           nullable: true
           description: URL de la documentación Swagger UI. Solo disponible fuera de producción.
-          example: 'http://localhost:3000/api/docs'
+          example: '/api/docs'
 
   # --------------------------------
   # Parameters
