@@ -50,7 +50,7 @@ info:
 servers:
   - url: http://localhost:3000
     description: Servidor de desarrollo local
-  - url: https://tu-app.railway.app
+  - url: https://proyectom2hernanramiroalbornoz-production.up.railway.app
     description: Servidor de producción (Railway)
 
 tags:
