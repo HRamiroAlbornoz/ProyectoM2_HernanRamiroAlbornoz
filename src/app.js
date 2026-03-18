@@ -3,6 +3,7 @@ import authorsRouter from '../routes/authors.routes.js';
 import postsRouter from '../routes/posts.routes.js';
 import { errorHandler } from './errorHandler.js';
 import { notFound } from './errors.js';
+import { swaggerUi, swaggerDocument } from './swagger.js';
 
 const app = express();
 
@@ -10,6 +11,22 @@ const app = express();
 // Middleware
 // ================================
 app.use(express.json());
+
+// ================================
+// Swagger UI
+// Solo disponible fuera de producción
+// Accesible en http://localhost:{PORT}/api/docs
+// ================================
+if (process.env.NODE_ENV !== 'production') {
+    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+        customSiteTitle: 'MiniBlog API — Docs',
+        swaggerOptions: {
+            docExpansion: 'list',       // muestra los grupos colapsados por defecto
+            filter: true,               // habilita el buscador de endpoints
+            showRequestDuration: true,  // muestra el tiempo de respuesta al probar
+        },
+    }));
+}
 
 // ================================
 // Rutas
@@ -24,7 +41,10 @@ app.get('/', (req, res) => {
         endpoints: {
             authors: '/api/authors',
             posts: '/api/posts',
-        }
+        },
+        docs: process.env.NODE_ENV !== 'production'
+            ? '/api/docs'
+            : null,
     });
 });
 

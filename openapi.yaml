@@ -1,0 +1,833 @@
+openapi: 3.0.3
+
+info:
+  title: MiniBlog API
+  description: |
+    API REST para gestión de un miniblog con autores y posts.
+    Permite crear, leer, actualizar y eliminar autores y posts,
+    con validaciones de campos, control de unicidad de email
+    y manejo centralizado de errores.
+
+    ## Endpoints disponibles
+    - **/api/authors** — Gestión completa de autores (CRUD)
+    - **/api/posts** — Gestión completa de posts (CRUD)
+    - **/api/posts/author/:authorId** — Posts de un autor con sus datos
+
+    ## Validaciones
+    - Los campos `name` y `email` son obligatorios para autores
+    - Los campos `title`, `content` y `author_id` son obligatorios para posts
+    - El email debe tener formato válido y ser único en el sistema
+    - Los IDs deben ser números enteros positivos
+    - El campo `published` debe ser booleano (`true` o `false`)
+
+    ## Manejo de errores
+    Todas las respuestas de error siguen un formato consistente:
+    ```json
+    {
+      "error": "Mensaje descriptivo del error",
+      "status": 400
+    }
+    ```
+    El campo `stack` con el stack trace solo aparece cuando
+    la variable de entorno `NODE_ENV` tiene el valor `development`.
+    En producción nunca se exponen detalles internos del servidor.
+
+    ## Códigos de estado HTTP utilizados
+    | Código | Significado | Cuándo ocurre |
+    |--------|-------------|---------------|
+    | 200 | OK | Consulta o actualización exitosa |
+    | 201 | Created | Recurso creado exitosamente |
+    | 204 | No Content | Eliminación exitosa |
+    | 400 | Bad Request | Validación fallida o datos inválidos |
+    | 404 | Not Found | Recurso o ruta no encontrada |
+    | 409 | Conflict | Email duplicado |
+    | 500 | Internal Server Error | Error no manejado del servidor |
+    | 503 | Service Unavailable | Base de datos no disponible |
+  version: 1.0.0
+  contact:
+    name: Hernán Ramiro Albornoz
+
+servers:
+  - url: http://localhost:3000
+    description: Servidor de desarrollo local
+
+tags:
+  - name: General
+    description: Endpoints generales de la API
+    x-order: 0
+  - name: Authors
+    description: |
+      Gestión completa de autores.
+      Un autor puede tener múltiples posts asociados (relación 1:N).
+      Al eliminar un autor, todos sus posts son eliminados automáticamente (CASCADE).
+    x-order: 1
+  - name: Posts
+    description: |
+      Gestión completa de posts.
+      Cada post pertenece a un único autor (relación N:1).
+      Incluye endpoint especial para obtener posts con el detalle completo de su autor.
+    x-order: 2
+
+# ================================
+# PATHS
+# ================================
+paths:
+
+  # --------------------------------
+  # General
+  # --------------------------------
+  /:
+    get:
+      tags:
+        - General
+      operationId: getWelcome
+      summary: Bienvenida
+      description: Retorna un mensaje de bienvenida y la lista de endpoints disponibles.
+      responses:
+        '200':
+          description: Información general de la API
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WelcomeResponse'
+              example:
+                message: MiniBlog API
+                endpoints:
+                  authors: /api/authors
+                  posts: /api/posts
+
+  # --------------------------------
+  # Authors
+  # --------------------------------
+  /api/authors:
+    get:
+      tags:
+        - Authors
+      operationId: getAllAuthors
+      summary: Listar todos los autores
+      description: Retorna la lista completa de autores ordenada por fecha de creación descendente.
+      responses:
+        '200':
+          description: Lista de autores obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Author'
+              example:
+                - id: 1
+                  name: María García
+                  email: maria.garcia@email.com
+                  bio: Desarrolladora frontend apasionada por el diseño UX.
+                  created_at: '2024-01-15T10:30:00.000Z'
+                - id: 2
+                  name: Carlos López
+                  email: carlos.lopez@email.com
+                  bio: Backend developer con experiencia en APIs REST.
+                  created_at: '2024-01-14T09:00:00.000Z'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    post:
+      tags:
+        - Authors
+      operationId: createAuthor
+      summary: Crear un autor
+      description: Crea un nuevo autor con name, email y bio opcional. El email debe ser único en el sistema.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorInput'
+            example:
+              name: Ana Martínez
+              email: ana.martinez@email.com
+              bio: Escritora técnica y entusiasta del open source.
+      responses:
+        '201':
+          description: Autor creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Author'
+              example:
+                id: 3
+                name: Ana Martínez
+                email: ana.martinez@email.com
+                bio: Escritora técnica y entusiasta del open source.
+                created_at: '2024-01-16T11:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/authors/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+
+    get:
+      tags:
+        - Authors
+      operationId: getAuthorById
+      summary: Obtener un autor por ID
+      description: Retorna el detalle de un autor específico según su ID.
+      responses:
+        '200':
+          description: Autor encontrado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Author'
+              example:
+                id: 1
+                name: María García
+                email: maria.garcia@email.com
+                bio: Desarrolladora frontend apasionada por el diseño UX.
+                created_at: '2024-01-15T10:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    put:
+      tags:
+        - Authors
+      operationId: updateAuthor
+      summary: Actualizar un autor
+      description: |
+        Reemplaza completamente los datos de un autor existente.
+        Todos los campos obligatorios deben enviarse en el body.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorInput'
+            example:
+              name: María García Actualizada
+              email: maria.garcia@email.com
+              bio: Nueva bio actualizada.
+      responses:
+        '200':
+          description: Autor actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Author'
+              example:
+                id: 1
+                name: María García Actualizada
+                email: maria.garcia@email.com
+                bio: Nueva bio actualizada.
+                created_at: '2024-01-15T10:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    delete:
+      tags:
+        - Authors
+      operationId: deleteAuthor
+      summary: Eliminar un autor
+      description: |
+        Elimina un autor permanentemente.
+
+        **Atención**: al eliminar un autor, todos sus posts asociados
+        serán eliminados automáticamente por la restricción
+        `ON DELETE CASCADE` definida en la base de datos.
+
+        No retorna contenido en caso de éxito (HTTP 204).
+      responses:
+        '204':
+          description: Autor eliminado exitosamente
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  # --------------------------------
+  # Posts
+  # --------------------------------
+  /api/posts:
+    get:
+      tags:
+        - Posts
+      operationId: getAllPosts
+      summary: Listar todos los posts
+      description: Retorna la lista completa de posts ordenada por fecha de creación descendente.
+      responses:
+        '200':
+          description: Lista de posts obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+              example:
+                - id: 1
+                  title: Introducción a React
+                  content: React es una librería de JavaScript...
+                  author_id: 1
+                  published: true
+                  created_at: '2024-01-15T12:00:00.000Z'
+                - id: 2
+                  title: CSS Grid vs Flexbox
+                  content: Dos herramientas muy poderosas...
+                  author_id: 1
+                  published: false
+                  created_at: '2024-01-14T10:00:00.000Z'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    post:
+      tags:
+        - Posts
+      operationId: createPost
+      summary: Crear un post
+      description: |
+        Crea un nuevo post asociado a un autor existente.
+        El campo `published` es opcional y tiene valor `false` por defecto.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostInput'
+            example:
+              title: Cómo construir una API REST
+              content: Una API REST permite comunicar el frontend con el backend...
+              author_id: 2
+              published: true
+      responses:
+        '201':
+          description: Post creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+              example:
+                id: 8
+                title: Cómo construir una API REST
+                content: Una API REST permite comunicar el frontend con el backend...
+                author_id: 2
+                published: true
+                created_at: '2024-01-16T14:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: El author_id proporcionado no existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: No existe un autor con id 99
+                status: 404
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/posts/author/{authorId}:
+    get:
+      tags:
+        - Posts
+      operationId: getPostsByAuthor
+      summary: Obtener posts de un autor con sus datos
+      description: |
+        Retorna todos los posts de un autor específico junto con
+        el detalle completo del autor (JOIN). Ordenados por fecha
+        de creación descendente.
+      parameters:
+        - name: authorId
+          in: path
+          required: true
+          description: ID del autor cuyos posts se quieren obtener
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+      responses:
+        '200':
+          description: Posts del autor obtenidos exitosamente
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostWithAuthor'
+              example:
+                - id: 1
+                  title: Introducción a React
+                  content: React es una librería de JavaScript...
+                  published: true
+                  created_at: '2024-01-15T12:00:00.000Z'
+                  author_id: 1
+                  author_name: María García
+                  author_email: maria.garcia@email.com
+                  author_bio: Desarrolladora frontend apasionada por el diseño UX.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: No se encontraron posts para el autor indicado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: No se encontraron posts para este autor
+                status: 404
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/posts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+
+    get:
+      tags:
+        - Posts
+      operationId: getPostById
+      summary: Obtener un post por ID
+      description: Retorna el detalle de un post específico según su ID.
+      responses:
+        '200':
+          description: Post encontrado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+              example:
+                id: 1
+                title: Introducción a React
+                content: React es una librería de JavaScript...
+                author_id: 1
+                published: true
+                created_at: '2024-01-15T12:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    put:
+      tags:
+        - Posts
+      operationId: updatePost
+      summary: Actualizar un post
+      description: |
+        Reemplaza completamente los datos de un post existente.
+        Todos los campos obligatorios deben enviarse en el body.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostInput'
+            example:
+              title: Introducción a React — Actualizado
+              content: React es una librería de JavaScript actualizada...
+              author_id: 1
+              published: true
+      responses:
+        '200':
+          description: Post actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+              example:
+                id: 1
+                title: Introducción a React — Actualizado
+                content: React es una librería de JavaScript actualizada...
+                author_id: 1
+                published: true
+                created_at: '2024-01-15T12:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    delete:
+      tags:
+        - Posts
+      operationId: deletePost
+      summary: Eliminar un post
+      description: |
+        Elimina un post específico permanentemente.
+        No retorna contenido en caso de éxito (HTTP 204).
+      responses:
+        '204':
+          description: Post eliminado exitosamente
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+# ================================
+# COMPONENTS
+# ================================
+components:
+
+  # --------------------------------
+  # Schemas
+  # --------------------------------
+  schemas:
+
+    Author:
+      type: object
+      description: Representa un autor en el sistema
+      properties:
+        id:
+          type: integer
+          description: Identificador único del autor (generado automáticamente)
+          example: 1
+        name:
+          type: string
+          description: Nombre completo del autor
+          maxLength: 100
+          example: María García
+        email:
+          type: string
+          format: email
+          description: Email único del autor (normalizado a minúsculas)
+          maxLength: 150
+          example: maria.garcia@email.com
+        bio:
+          type: string
+          nullable: true
+          description: Biografía opcional del autor
+          example: Desarrolladora frontend apasionada por el diseño UX.
+        created_at:
+          type: string
+          format: date-time
+          description: Fecha y hora de creación en formato ISO 8601 con timezone
+          example: '2024-01-15T10:30:00.000Z'
+
+    AuthorInput:
+      type: object
+      description: Datos requeridos para crear o actualizar un autor
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          description: Nombre completo del autor
+          maxLength: 100
+          example: Ana Martínez
+        email:
+          type: string
+          format: email
+          pattern: '^[^\s@]+@[^\s@]+\.[^\s@]+$'
+          description: |
+            Email único del autor. Debe tener formato válido.
+            Se normaliza a minúsculas antes de almacenarse.
+          maxLength: 150
+          example: ana.martinez@email.com
+        bio:
+          type: string
+          nullable: true
+          description: Biografía opcional del autor
+          example: Escritora técnica y entusiasta del open source.
+
+    Post:
+      type: object
+      description: Representa un post en el sistema
+      properties:
+        id:
+          type: integer
+          description: Identificador único del post (generado automáticamente)
+          example: 1
+        title:
+          type: string
+          description: Título del post
+          maxLength: 200
+          example: Introducción a React
+        content:
+          type: string
+          description: Contenido completo del post
+          maxLength: 5000
+          example: React es una librería de JavaScript para construir interfaces de usuario...
+        author_id:
+          type: integer
+          description: ID del autor al que pertenece el post
+          example: 1
+        published:
+          type: boolean
+          description: Indica si el post está publicado. Valor por defecto false.
+          default: false
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          description: Fecha y hora de creación en formato ISO 8601 con timezone
+          example: '2024-01-15T12:00:00.000Z'
+
+    PostInput:
+      type: object
+      description: Datos requeridos para crear o actualizar un post
+      required:
+        - title
+        - content
+        - author_id
+      properties:
+        title:
+          type: string
+          description: Título del post
+          maxLength: 200
+          example: Cómo construir una API REST
+        content:
+          type: string
+          description: Contenido completo del post
+          maxLength: 5000
+          example: Una API REST permite comunicar el frontend con el backend...
+        author_id:
+          type: integer
+          minimum: 1
+          description: ID de un autor existente en el sistema
+          example: 2
+        published:
+          type: boolean
+          description: Estado de publicación. Si no se envía, el valor por defecto es false.
+          default: false
+          example: true
+
+    PostWithAuthor:
+      type: object
+      description: Post con los datos completos de su autor (resultado de JOIN)
+      properties:
+        id:
+          type: integer
+          description: Identificador único del post
+          example: 1
+        title:
+          type: string
+          description: Título del post
+          example: Introducción a React
+        content:
+          type: string
+          description: Contenido completo del post
+          example: React es una librería de JavaScript...
+        published:
+          type: boolean
+          description: Estado de publicación del post
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          description: Fecha y hora de creación en formato ISO 8601 con timezone
+          example: '2024-01-15T12:00:00.000Z'
+        author_id:
+          type: integer
+          description: ID del autor
+          example: 1
+        author_name:
+          type: string
+          description: Nombre del autor
+          example: María García
+        author_email:
+          type: string
+          format: email
+          description: Email del autor
+          example: maria.garcia@email.com
+        author_bio:
+          type: string
+          nullable: true
+          description: Biografía del autor
+          example: Desarrolladora frontend apasionada por el diseño UX.
+
+    ErrorResponse:
+      type: object
+      description: Estructura estándar de respuesta de error
+      properties:
+        error:
+          type: string
+          description: Mensaje descriptivo del error
+          example: Autor no encontrado
+        status:
+          type: integer
+          description: Código de estado HTTP
+          example: 404
+        stack:
+          type: string
+          description: Stack trace del error. Solo visible cuando NODE_ENV=development
+          example: 'Error: Autor no encontrado\n    at ...'
+
+    WelcomeResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: MiniBlog API
+        endpoints:
+          type: object
+          properties:
+            authors:
+              type: string
+              example: /api/authors
+            posts:
+              type: string
+              example: /api/posts
+        docs:
+          type: string
+          nullable: true
+          description: URL de la documentación Swagger UI. Solo disponible fuera de producción.
+          example: 'http://localhost:3000/api/docs'
+
+  # --------------------------------
+  # Parameters
+  # --------------------------------
+  parameters:
+
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      description: ID numérico entero positivo del recurso
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
+
+  # --------------------------------
+  # Responses reutilizables
+  # --------------------------------
+  responses:
+
+    BadRequest:
+      description: |
+        Error de validación. Ocurre cuando:
+        - Falta un campo obligatorio
+        - Un campo supera la longitud máxima permitida
+        - El formato del email es inválido
+        - El ID no es un entero positivo
+        - El campo `published` no es booleano
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            campo_requerido:
+              summary: Campo obligatorio faltante
+              value:
+                error: El campo name es obligatorio
+                status: 400
+            campo_muy_largo:
+              summary: Campo supera longitud máxima
+              value:
+                error: El campo name no puede superar los 100 caracteres
+                status: 400
+            email_invalido:
+              summary: Formato de email inválido
+              value:
+                error: El formato del email no es válido
+                status: 400
+            id_invalido:
+              summary: ID no es un entero positivo
+              value:
+                error: El id debe ser un número entero positivo
+                status: 400
+
+    NotFound:
+      description: |
+        Recurso no encontrado. Ocurre cuando:
+        - El ID proporcionado no existe en la base de datos
+        - La ruta solicitada no existe en la API
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            autor_no_encontrado:
+              summary: Autor no encontrado
+              value:
+                error: Autor no encontrado
+                status: 404
+            post_no_encontrado:
+              summary: Post no encontrado
+              value:
+                error: Post no encontrado
+                status: 404
+            ruta_no_encontrada:
+              summary: Ruta no existe en la API
+              value:
+                error: No se encontró la ruta /api/recurso-inexistente
+                status: 404
+
+    Conflict:
+      description: |
+        Conflicto de datos. Ocurre cuando:
+        - El email proporcionado ya está registrado en el sistema
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: El email maria.garcia@email.com ya está registrado
+            status: 409
+
+    InternalServerError:
+      description: |
+        Error interno del servidor. Ocurre cuando:
+        - Se produce un error no manejado en el servidor
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Error interno del servidor
+            status: 500
+
+    ServiceUnavailable:
+      description: |
+        Servicio no disponible. Ocurre cuando:
+        - La base de datos PostgreSQL no está corriendo
+        - Las credenciales de conexión son incorrectas
+        - El servidor de base de datos es inaccesible
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: No se puede conectar a la base de datos
+            status: 503

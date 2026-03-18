@@ -24,7 +24,9 @@
   "homepage": "https://github.com/HRamiroAlbornoz/ProyectoM2_HernanRamiroAlbornoz#readme",
   "dependencies": {
     "express": "^5.2.1",
-    "pg": "^8.20.0"
+    "pg": "^8.20.0",
+    "swagger-ui-express": "^5.0.1",
+    "yaml": "^2.8.2"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.0",
