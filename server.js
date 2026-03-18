@@ -1,5 +1,5 @@
 import { loadEnvFile } from 'node:process';
-import app from './app.js';
+import app from './src/app.js';
 
 loadEnvFile('.env');
 

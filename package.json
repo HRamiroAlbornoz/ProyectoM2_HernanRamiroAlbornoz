@@ -2,10 +2,11 @@
   "name": "proyectom2_hernanramiroalbornoz",
   "version": "1.0.0",
   "description": "MiniBlog API",
-  "main": "src/server.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage"
   },
